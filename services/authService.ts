@@ -1,9 +1,10 @@
-import fs from "fs/promises";
-import path from "path";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { Request, Response } from "express";
+import { User } from "../types/users.js";
+import UserService from "./userService.js";
+import { JwtTokenPayload, LoginResponse } from "../types/auth.js";
+import assert from "node:assert";
 
 export const RegisterSchema = z.object({
   firstName: z.string().min(3, "Username must be at least 3 characters"),
@@ -17,44 +18,33 @@ export const LoginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-export interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  passwordHash: string;
+const JWT_TOKEN_EXPIRY = "1h";
+function getJwtSecret() {
+  assert(process.env.JWT_SECRET, "JWT_SECRET is not defined");
+  return process.env.JWT_SECRET;
 }
 
-const JWT_SECRET = "your_jwt_secret_key_here";
-
-const USERS_FILE_PATH = path.join(process.cwd(), "users.json");
+function verifyAsync(token: string) {
+  const JWT_SECRET = getJwtSecret();
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, JWT_SECRET, (err, payload) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(payload);
+      }
+    });
+  });
+}
 
 class AuthService {
-  static async readUsers(): Promise<User[]> {
-    try {
-      const usersData = await fs.readFile(USERS_FILE_PATH, "utf-8");
-      return JSON.parse(usersData);
-    } catch (error) {
-      return [];
-    }
-  }
-
-  static async writeUsers(users: User[]): Promise<void> {
-    await fs.writeFile(USERS_FILE_PATH, JSON.stringify(users, null, 2));
-  }
-
-  static generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-  }
-
   static async register(
     userData: z.infer<typeof RegisterSchema>
   ): Promise<Omit<User, "passwordHash">> {
     const validatedData = RegisterSchema.parse(userData);
 
-    const users = await this.readUsers();
+    const existingUser = await UserService.getUserByEmail(userData.email);
 
-    const existingUser = users.find((u) => u.email === validatedData.email);
     if (existingUser) {
       throw new Error("User with this email already exists");
     }
@@ -62,61 +52,58 @@ class AuthService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(validatedData.password, salt);
 
-    const newUser: User = {
-      id: this.generateId(),
+    const newUser: Omit<User, "id"> = {
       firstName: validatedData.firstName,
       lastName: validatedData.lastName,
       email: validatedData.email,
       passwordHash,
     };
 
-    users.push(newUser);
-    await this.writeUsers(users);
+    const { passwordHash: _, ...userWithoutHash } =
+      await UserService.createUser(newUser);
 
-    const { passwordHash: _, ...userWithoutHash } = newUser;
     return userWithoutHash;
   }
 
-  static async login(loginData: z.infer<typeof LoginSchema>): Promise<string> {
+  static async login(
+    loginData: z.infer<typeof LoginSchema>
+  ): Promise<LoginResponse> {
     const validatedData = LoginSchema.parse(loginData);
+    const JWT_SECRET = getJwtSecret();
 
-    const users = await this.readUsers();
-
-    const user = users.find((u) => u.email === validatedData.email);
+    const user = await UserService.getUserByEmail(validatedData.email);
     if (!user) {
       throw new Error("Invalid email or password");
     }
 
-    const isMatch = await bcrypt.compare(
-      validatedData.password,
-      user.passwordHash
-    );
+    const { passwordHash, ...userWithoutHash } = user;
+
+    const isMatch = await bcrypt.compare(validatedData.password, passwordHash);
+
     if (!isMatch) {
       throw new Error("Invalid email or password");
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: "1h",
+    const payload: JwtTokenPayload = { id: user.id, email: user.email };
+    const token = jwt.sign(payload, JWT_SECRET, {
+      expiresIn: JWT_TOKEN_EXPIRY,
     });
 
-    return token;
+    return { token, user: userWithoutHash };
   }
 
-  static async verifyRequest(req: Request, res: Response, next: () => void) {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-
-    if (!token) {
-      return res
-        .status(401)
-        .json({ message: "No token, authorization denied" });
-    }
-
+  static async validateToken(token: string) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      (req as any).user = decoded;
-      next();
+      const decoded = (await verifyAsync(token)) as JwtTokenPayload;
+      return {
+        valid: true,
+        data: decoded,
+      };
     } catch (error) {
-      res.status(401).json({ message: "Token is not valid" });
+      return {
+        valid: false,
+        data: null,
+      };
     }
   }
 }

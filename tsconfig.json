@@ -8,8 +8,9 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
   },
-  "include": ["./**/*.ts"],
+  "include": ["./**/*.ts", "./**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }
