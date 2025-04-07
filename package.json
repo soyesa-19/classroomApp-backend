@@ -9,6 +9,7 @@
     "dev": "cross-env  DEBUG=express:* tsx --watch server.ts",
     "dev:local": "concurrently \"firebase emulators:start --import=./mocks/seed  --debug\" \"cross-env FIRESTORE_EMULATOR_HOST='localhost:8080' tsx --watch server.ts\"",
     "build": "tsc",
+    "emulator:export": "firebase emulators:export ./mocks/seed/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
