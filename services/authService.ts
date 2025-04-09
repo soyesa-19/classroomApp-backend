@@ -84,7 +84,7 @@ class AuthService {
       throw new Error("Invalid email or password");
     }
 
-    const payload: JwtTokenPayload = { id: user.id, email: user.email };
+    const payload: JwtTokenPayload = userWithoutHash;
     const token = jwt.sign(payload, JWT_SECRET, {
       expiresIn: JWT_TOKEN_EXPIRY,
     });

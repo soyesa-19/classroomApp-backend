@@ -14,8 +14,10 @@ export type RegisterResponse = {
 export interface JwtTokenPayload extends JwtPayload {
   id: string;
   email: string;
+  firstName: string;
+  lastName: string;
 }
 
 export interface AuthenticatedRequest extends Request {
-  user?: JwtTokenPayload | null;
+  user?: JwtTokenPayload;
 }

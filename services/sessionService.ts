@@ -1,94 +1,101 @@
 import { CollectionReference } from "firebase-admin/firestore";
 import { db } from "./firebase.js";
-import { type Session } from "../types/classroom.js";
-import ClassroomService from "./classroomService.js";
+import type { Classroom, Session } from "../types/classroom.js";
 
-class SessionService {
+export class SessionService {
   private static readonly sessionCollection = db.collection(
     "sessions"
   ) as CollectionReference<Session>;
 
   static async createSession(
-    classroomId: string,
+    classroom: Classroom,
     userId: string
-  ): Promise<{ sessionId: string; message: string }> {
-    // Get classroom data
-    const classroom = await ClassroomService.getClassroomById(classroomId);
-    if (!classroom) {
-      throw new Error("No classroom found for this id");
-    }
-
-    // Validate classroom
-    await ClassroomService.isClassroomValid(classroom);
-
-    // Check for existing sessions
-    const existingSessions = await this.getSessionsByClassroomId(classroomId);
-
-    if (existingSessions.length > 0) {
-      // Find the most recent session that isn't full
-      const rejoinUser = existingSessions.find((session) =>
-        session.users.includes(userId)
-      );
-      if (rejoinUser) {
-        return {
-          sessionId: rejoinUser.id,
-          message: "User rejoined to session",
-        };
-      }
-      const availableSession = existingSessions.find(
-        (session) => session.users.length < classroom.maxusers
-      );
-
-      if (availableSession) {
-        // Add user to available session if not already present
-        if (!availableSession.users.includes(userId)) {
-          await this.addUserToSession(availableSession.id, userId);
-        }
-        return {
-          sessionId: availableSession.id,
-          message: "Added to existing session",
-        };
-      }
-    }
-
+  ): Promise<Session> {
     // If no available sessions found, create a new one
-    const doc = await this.sessionCollection.doc();
+    const doc = SessionService.sessionCollection.doc();
     const newSession: Session = {
       id: doc.id,
-      users: [userId],
-      max_score: 0,
-      visibility: true,
-      classroom_id: classroomId,
+      status: "active",
+      users: [
+        {
+          id: userId,
+        },
+      ],
+      maxUsers: classroom.maxUsers,
+      visibility: "open",
+      classroomId: classroom.id,
     };
 
     await doc.set(newSession);
-    return {
-      sessionId: doc.id,
-      message: "New session created",
-    };
+    return newSession;
   }
 
-  private static async getSessionsByClassroomId(
-    classroomId: string
-  ): Promise<Session[]> {
-    const query = await this.sessionCollection
-      .where("classroom_id", "==", classroomId)
-      .orderBy("users", "asc") // Order by number of users to find less populated sessions first
+  static async getAvailableSessions(classroom: Classroom): Promise<Session[]> {
+    const sessionsSnap = await SessionService.sessionCollection
+      .where("classroomId", "==", classroom.id)
+      .where("status", "==", "active")
+      .where("visibility", "==", "open")
+      .where("users.length", "<", classroom.maxUsers)
       .get();
+    const sessions = sessionsSnap.docs.map((doc) => doc.data());
 
-    return query.docs.map((doc) => doc.data() as Session);
+    return sessions;
   }
 
-  private static async addUserToSession(
+  static async getActiveSession(sessionId: string) {
+    // Validate session exists
+    const sessionDoc = await SessionService.sessionCollection
+      .doc(sessionId)
+      .get();
+    const session = sessionDoc?.data();
+    if (!session || session.status === "ended") {
+      return null;
+    }
+
+    return session;
+  }
+
+  static async updateSessionUsers(
     sessionId: string,
-    userId: string
+    userIds: string[]
   ): Promise<void> {
-    const session = await this.sessionCollection.doc(sessionId).get();
-    const sessionData = session.data() as Session;
-    await this.sessionCollection.doc(sessionId).update({
-      users: [...sessionData.users, userId],
-    });
+    try {
+      // Validate session exists
+      const sessionData = await SessionService.getActiveSession(sessionId);
+
+      if (!sessionData) {
+        throw new Error("Failed to add user, Session not exists");
+      }
+
+      const users = sessionData.users;
+      const missingUsersIds = userIds.filter(
+        (userId) => !users.find((user) => user.id === userId)
+      );
+
+      // User is already part of session.
+      if (missingUsersIds.length === 0) {
+        return;
+      }
+
+      // Validate session isn't full
+      if (missingUsersIds.length + users.length >= sessionData.maxUsers) {
+        throw new Error("Session is full");
+      }
+
+      const aggregateUsers = users.concat(
+        missingUsersIds.map((userId) => ({
+          id: userId,
+        }))
+      );
+
+      // Add user to session
+      await SessionService.sessionCollection.doc(sessionId).set({
+        ...sessionData,
+        users: aggregateUsers,
+      });
+    } catch (error) {
+      console.error("Error adding user to session:", error);
+      throw error;
+    }
   }
 }
-
-export default SessionService;
