@@ -47,7 +47,11 @@ export class ConnectionManager {
       .map(([userId]) => userId);
   }
 
-  public updateSession(sessionId: string, userId: string, status: boolean) {
+  public updateUserSessionStatus(
+    sessionId: string,
+    userId: string,
+    status: boolean
+  ) {
     let session = this.sessions.get(sessionId);
     if (!session) {
       session = new Map();
@@ -60,6 +64,14 @@ export class ConnectionManager {
     if (connection) {
       connection.activeSession = status ? sessionId : undefined;
     }
+  }
+
+  public getSessionScore(sessionId: string) {
+    return this.sessionScores.get(sessionId);
+  }
+
+  public getSessionSectionScore(sessionId: string, sectionId: string) {
+    return this.sessionScores.get(sessionId)?.get(sectionId);
   }
 
   // Update user's score
