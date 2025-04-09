@@ -19,6 +19,7 @@
     "firebase": "^11.5.0",
     "firebase-admin": "^13.2.0",
     "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.8.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
