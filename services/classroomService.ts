@@ -102,9 +102,6 @@ export class ClassroomService {
 
   static async getAllClassrooms(): Promise<Classroom[]> {
     const classrooms = await this.classroomCollection.get();
-    return classrooms.docs.map((doc) => ({
-      ...doc.data(),
-      id: doc.id,
-    }));
+    return classrooms.docs.map((doc) => doc.data());
   }
 }
