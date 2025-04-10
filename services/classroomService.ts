@@ -99,4 +99,12 @@ export class ClassroomService {
     doc.set({ id: doc.id, ...classroomData });
     return doc.id;
   }
+
+  static async getAllClassrooms(): Promise<Classroom[]> {
+    const classrooms = await this.classroomCollection.get();
+    return classrooms.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    }));
+  }
 }

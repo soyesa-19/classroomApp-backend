@@ -46,3 +46,12 @@ export const leaveClassrooom = async (
     return res.status(statusCode).json({ error: error.message });
   }
 };
+
+export const getClassrooms = async (req: Request, res: Response) => {
+  try {
+    const classrooms = await ClassroomService.getAllClassrooms();
+    res.status(200).json(classrooms);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch classrooms" });
+  }
+};
