@@ -5,6 +5,7 @@ export type Section = {
   name: string;
   type: "game" | "video";
   properties: any;
+  durationInMinutes: number;
 };
 
 export type Classroom = {
