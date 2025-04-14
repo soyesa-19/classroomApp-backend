@@ -1,6 +1,6 @@
 import { CollectionReference } from "firebase-admin/firestore";
 import { db } from "./firebase.js";
-import { Session, type Classroom } from "../types/classroom.js";
+import type { Session, Classroom } from "../types/classroom.js";
 import { SessionService } from "./sessionService.js";
 import { UserScoreService } from "./userScoreService.js";
 import { SectionService } from "./sectionService.js";
@@ -37,10 +37,14 @@ export class ClassroomService {
     const sessionScores = await UserScoreService.getScoresForSession(
       session.id
     );
+    const sections = await ClassroomService.getSectionsForClassroomId(
+      classroomId
+    );
 
     return {
       session,
       scores: sessionScores,
+      sections,
     };
   }
 
@@ -63,7 +67,6 @@ export class ClassroomService {
     classroomEndTime.setMinutes(
       classroomEndTime.getMinutes() + classroom.duration
     );
-    console.log(now, classroomStartTime, classroomEndTime);
 
     if (now < classroomStartTime) {
       throw new Error("classroom has not started yet");
