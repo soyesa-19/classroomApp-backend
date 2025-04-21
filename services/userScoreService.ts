@@ -2,7 +2,7 @@ import {
   CollectionReference,
   DocumentReference,
 } from "firebase-admin/firestore";
-import { db } from "./firebase.js";
+import { db, archiveCollectionData } from "./firebase.js";
 import type {
   SessionScores,
   SessionSectionUserScore,
@@ -80,5 +80,9 @@ export class UserScoreService {
     userScoreData.score = userScore.score;
     await this.userScoresCollection.doc(userScoreData.id).set(userScoreData);
     return userScoreData;
+  }
+
+  static async archiveUserScores(batchSize: number = 500): Promise<void> {
+    await archiveCollectionData("userScores", batchSize);
   }
 }

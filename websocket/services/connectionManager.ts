@@ -11,11 +11,13 @@ export class ConnectionManager {
   private connections: Map<string, UserConnection>;
   private sessions: Map<string, Map<string, boolean>>; // sessionId -> userId -> connected to session
   private sessionScores: Map<string, Map<string, Map<string, number>>>; // sessionId -> sectionId -> userId -> score
+  private bookedSession: Map<string, { sessionId: string, users: Set<string>, openSlots: number }>;
 
   private constructor() {
     this.connections = new Map();
     this.sessions = new Map();
     this.sessionScores = new Map();
+    this.bookedSession = new Map();
   }
 
   public static getInstance(): ConnectionManager {
@@ -23,6 +25,10 @@ export class ConnectionManager {
       ConnectionManager.instance = new ConnectionManager();
     }
     return ConnectionManager.instance;
+  }
+
+  public getConnection(userId: string) {
+    return this.connections.get(userId)
   }
 
   // Add a new connection
@@ -44,6 +50,11 @@ export class ConnectionManager {
   public getActiveSessionUsers(sessionId: string) {
     return Array.from(this.sessions.get(sessionId)?.entries() || [])
       .filter(([_, status]) => status)
+      .map(([userId]) => userId);
+  }
+
+  public getAllSessionUsers(sessionId: string) {
+    return Array.from(this.sessions.get(sessionId)?.entries() || [])
       .map(([userId]) => userId);
   }
 
@@ -95,6 +106,52 @@ export class ConnectionManager {
       userScore = scoreData.score;
       sectionScore.set(scoreData.sessionId, userScore);
     }
+  }
+
+  public addBooking(bookingId: string, bookingRecord: { sessionId: string, openSlots: number; }) {
+    this.bookedSession.set(bookingId, { users: new Set(), ...this.getBooking(bookingId), ...bookingRecord });
+  }
+
+  public addUserToBooking(bookingId: string, userId: string) {
+    const existingBooking = this.getBooking(bookingId);
+    if (!existingBooking) {
+      throw new Error('Invalid operation, booking not initialized')
+    }
+    existingBooking.users.add(userId)
+  }
+
+  public decrementOpenBookingSlots(bookingId: string) {
+    const existingBooking = this.getBooking(bookingId);
+    if (!existingBooking) {
+      throw new Error('Invalid operation, booking not initialized')
+    }
+    if (existingBooking.openSlots <= 0) {
+      throw new Error("Invalid operation, no open slots available")
+    }
+    existingBooking.openSlots -= 1
+
+    return existingBooking.openSlots;
+  }
+
+  public incrementOpenBookingSlots(bookingId: string) {
+    const existingBooking = this.getBooking(bookingId);
+    if (!existingBooking) {
+      throw new Error('Invalid operation, booking not initialized')
+    }
+
+    existingBooking.openSlots += 1
+
+    return existingBooking.openSlots;
+  }
+
+  public getBooking(bookingId: string) {
+    return this.bookedSession.get(bookingId);
+  }
+
+  public getBookingBySessionId(sessionId: string) {
+    return Array.from(this.bookedSession.entries()).filter(([_, record]) => {
+      return record.sessionId === sessionId
+    })[0]
   }
 
   // Get connection statistics
