@@ -1,6 +1,7 @@
 import { Socket } from "socket.io";
 import { ConnectionManager } from "../services/connectionManager.js";
 import { UserScoreService } from "../../services/userScoreService.js";
+import { SessionService } from "../../services/sessionService.js";
 import UserService from "../../services/userService.js";
 
 const connectionManager = ConnectionManager.getInstance();
@@ -9,6 +10,7 @@ export const handleSessionEvents = (socket: Socket) => {
   // Join a session
   socket.on("join-session", async (sessionId: string, cb) => {
     const { user } = socket.data;
+    console.log(sessionId, user, connectionManager.getConnectionStats());
     connectionManager.updateUserSessionStatus(sessionId, user.id, true);
 
     socket.join(`session:${sessionId}`);
@@ -28,15 +30,25 @@ export const handleSessionEvents = (socket: Socket) => {
     }));
     console.log(sessionUserDetails);
     cb(sessionUserDetails);
+
+    const [bookingId, record] =
+      connectionManager.getBookingBySessionId(sessionId) || [];
+    if (bookingId) {
+      if (!record.users.has(user.id)) {
+        const remainingSlots =
+          connectionManager.decrementOpenBookingSlots(bookingId);
+        if (remainingSlots === 0) {
+          await SessionService.updateSessionVisibility(sessionId, "restricted");
+          return;
+        }
+      }
+    }
   });
 
   // Leave a session
   socket.on("leave-session", async (sessionId: string) => {
     const { user } = socket.data;
-    connectionManager.updateUserSessionStatus(sessionId, user.id, false);
-
-    socket.leave(`session:${sessionId}`);
-    socket.to(`session:${sessionId}`).emit("user-left", user.id);
+    await SessionService.leaveSession(user.id);
   });
 
   // Handle session messages

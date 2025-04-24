@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase-admin/firestore";
+
 export type Visibility = "open" | "restricted";
 
 export type Section = {
@@ -11,8 +13,8 @@ export type Section = {
 export type Classroom = {
   id: string;
   name: string;
-  startTime: Date;
-  duration: number; // in minutes
+  startTime: Timestamp;
+  durationInMinutes: number; // in minutes
   status: "active" | "inactive";
   sections: string[];
   visibility: Visibility;
@@ -31,3 +33,9 @@ export type Session = {
   visibility: Visibility;
   classroomId: string;
 };
+
+export type Booking = {
+  id: string;
+  classroomId: string;
+  userCount: number; 
+}

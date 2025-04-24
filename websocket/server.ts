@@ -3,6 +3,7 @@ import { Server as HttpServer } from "http";
 import { authenticateSocket } from "./middleware/auth.js";
 import { handleSessionEvents } from "./handlers/session.js";
 import { ConnectionManager } from "./services/connectionManager.js";
+import { SessionService } from "../services/sessionService.js";
 
 export const initializeWebSocketServer = (httpServer: HttpServer) => {
   const io = new Server(httpServer, {
@@ -28,6 +29,7 @@ export const initializeWebSocketServer = (httpServer: HttpServer) => {
     // Handle disconnection
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.data.user.id}`);
+      SessionService.leaveSession(socket.data.user.id)
       connectionManager.removeConnection(socket.data.user.id);
     });
   });
