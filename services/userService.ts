@@ -50,6 +50,23 @@ class UserService {
       throw error;
     }
   }
+
+  static async getUsers(userIds: string[]): Promise<User[]> {
+    if (!userIds) {
+      return [];
+    }
+    try {
+      const usersDocs = userIds.map((userId) =>
+        UserService.usersCollection.doc(userId)
+      );
+      return (await db.getAll(...usersDocs)).map((userDoc) =>
+        userDoc.data()
+      ) as User[];
+    } catch (error) {
+      console.error("Error getting user:", error);
+      throw new Error("Failed to get user");
+    }
+  }
 }
 
 export default UserService;

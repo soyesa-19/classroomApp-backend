@@ -35,9 +35,11 @@ export class SessionService {
       .where("classroomId", "==", classroom.id)
       .where("status", "==", "active")
       .where("visibility", "==", "open")
-      .where("users.length", "<", classroom.maxUsers)
       .get();
-    const sessions = sessionsSnap.docs.map((doc) => doc.data());
+
+    const sessions = sessionsSnap.docs
+      .map((doc) => doc.data())
+      .filter((session) => session.users.length < classroom.maxUsers);
 
     return sessions;
   }

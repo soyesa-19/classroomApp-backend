@@ -1,12 +1,13 @@
 import { Socket } from "socket.io";
 import { ConnectionManager } from "../services/connectionManager.js";
 import { UserScoreService } from "../../services/userScoreService.js";
+import UserService from "../../services/userService.js";
 
 const connectionManager = ConnectionManager.getInstance();
 
 export const handleSessionEvents = (socket: Socket) => {
   // Join a session
-  socket.on("join-session", (sessionId: string) => {
+  socket.on("join-session", async (sessionId: string, cb) => {
     const { user } = socket.data;
     connectionManager.updateUserSessionStatus(sessionId, user.id, true);
 
@@ -15,7 +16,18 @@ export const handleSessionEvents = (socket: Socket) => {
       userId: user.id,
       username: `${user.firstName} ${user.lastName}`,
       timestamp: new Date().toISOString(),
+      currentUser: false,
     });
+    const sessionUsers = connectionManager.getActiveSessionUsers(sessionId);
+    console.log(sessionUsers);
+    const userDetails = await UserService.getUsers(sessionUsers);
+    const sessionUserDetails = userDetails.map((userDetail) => ({
+      userId: userDetail.id,
+      username: userDetail.firstName + " " + userDetail.lastName,
+      timestamp: new Date().toISOString(),
+    }));
+    console.log(sessionUserDetails);
+    cb(sessionUserDetails);
   });
 
   // Leave a session
