@@ -48,16 +48,17 @@ export class SessionService {
       .where("classroomId", "==", classroom.id)
       .where("status", "==", "active")
       .where("visibility", "==", "open")
-      .where(
-        "users.length",
-        "<",
-        classroom.maxUsers - bookedSlots - BOOKING_OFFSET
-      )
       .get();
 
     const sessions = sessionsSnap.docs
       .map((doc) => doc.data())
-      .filter((session) => session.users.length < classroom.maxUsers);
+      .filter(
+        (session) =>
+          session.users.length <
+          classroom.maxUsers -
+            bookedSlots -
+            (bookedSlots > 0 ? BOOKING_OFFSET : 0)
+      );
 
     return sessions;
   }

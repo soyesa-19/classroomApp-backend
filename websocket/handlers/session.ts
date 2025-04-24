@@ -10,7 +10,7 @@ export const handleSessionEvents = (socket: Socket) => {
   // Join a session
   socket.on("join-session", async (sessionId: string, cb) => {
     const { user } = socket.data;
-    console.log(sessionId, user, connectionManager.getConnectionStats());
+
     connectionManager.updateUserSessionStatus(sessionId, user.id, true);
 
     socket.join(`session:${sessionId}`);
@@ -21,14 +21,12 @@ export const handleSessionEvents = (socket: Socket) => {
       currentUser: false,
     });
     const sessionUsers = connectionManager.getActiveSessionUsers(sessionId);
-    console.log(sessionUsers);
     const userDetails = await UserService.getUsers(sessionUsers);
     const sessionUserDetails = userDetails.map((userDetail) => ({
       userId: userDetail.id,
       username: userDetail.firstName + " " + userDetail.lastName,
       timestamp: new Date().toISOString(),
     }));
-    console.log(sessionUserDetails);
     cb(sessionUserDetails);
 
     const [bookingId, record] =
