@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { AuthenticatedRequest } from "../types/auth.js";
 import { ClassroomService } from "../services/classroomService.js";
-import { Auth } from "firebase-admin/auth";
+import { BookingService } from "../services/bookingService.js";
 
 export const joinClassroom = async (
   req: AuthenticatedRequest,
@@ -24,6 +24,35 @@ export const joinClassroom = async (
     return res.status(statusCode).json({ error: error.message });
   }
 };
+
+export const joinClassroomUsingBookingId = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const { bookingId } = req.body;
+    const userId = req.user?.id;
+
+    if (!bookingId || !userId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const booking = await BookingService.getBookingById(bookingId)
+    if (!booking) {
+      return res.status(404).json({error: "No booking found!"})
+    }
+    const classroomId = booking.classroomId;
+
+    const result = await ClassroomService.joinClassroom(classroomId, userId, booking);
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    console.error("Error creating session:", error);
+    const statusCode = error.message === "Internal server error" ? 500 : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+};
+
 
 export const leaveClassrooom = async (
   req: AuthenticatedRequest,
