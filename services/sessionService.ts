@@ -3,7 +3,6 @@ import { db, archiveCollectionData } from "./firebase.js";
 import type { Classroom, Session, Visibility } from "../types/classroom.js";
 import { ConnectionManager } from "../websocket/services/connectionManager.js";
 
-
 const BOOKING_OFFSET = 3;
 export class SessionService {
   private static readonly sessionCollection = db.collection(
@@ -34,23 +33,32 @@ export class SessionService {
   }
 
   static async getSessionById(id: string): Promise<Session | null> {
-    const sessionDoc = await SessionService.sessionCollection
-      .doc(id)
-      .get();
+    const sessionDoc = await SessionService.sessionCollection.doc(id).get();
     if (!sessionDoc.exists) {
       return null;
     }
     return sessionDoc.data() || null;
   }
 
-  static async getAvailableSessions(classroom: Classroom, bookedSlots: number): Promise<Session[]> {
+  static async getAvailableSessions(
+    classroom: Classroom,
+    bookedSlots: number
+  ): Promise<Session[]> {
     const sessionsSnap = await SessionService.sessionCollection
       .where("classroomId", "==", classroom.id)
       .where("status", "==", "active")
       .where("visibility", "==", "open")
-      .where("users.length", "<", classroom.maxUsers - bookedSlots - BOOKING_OFFSET)
       .get();
-    const sessions = sessionsSnap.docs.map((doc) => doc.data());
+
+    const sessions = sessionsSnap.docs
+      .map((doc) => doc.data())
+      .filter(
+        (session) =>
+          session.users.length <
+          classroom.maxUsers -
+            bookedSlots -
+            (bookedSlots > 0 ? BOOKING_OFFSET : 0)
+      );
 
     return sessions;
   }
@@ -68,13 +76,18 @@ export class SessionService {
     return session;
   }
 
-  static async updateSessionVisibility(sessionId: string, visibility: Visibility) {
+  static async updateSessionVisibility(
+    sessionId: string,
+    visibility: Visibility
+  ) {
     try {
       // Validate session exists
       const sessionData = await SessionService.getActiveSession(sessionId);
 
       if (!sessionData) {
-        throw new Error("Failed to update visibility, Session not exists or ended");
+        throw new Error(
+          "Failed to update visibility, Session not exists or ended"
+        );
       }
 
       // Add user to session
@@ -134,9 +147,9 @@ export class SessionService {
 
   static async leaveSession(userId: string) {
     const connectionManager = ConnectionManager.getInstance();
-    const connection = connectionManager.getConnection(userId)
+    const connection = connectionManager.getConnection(userId);
     if (!connection) {
-      return
+      return;
     }
     const { socket, activeSession } = connection;
     if (!activeSession) {
@@ -145,17 +158,19 @@ export class SessionService {
     const { user } = socket.data;
     connectionManager.updateUserSessionStatus(activeSession, user.id, false);
 
-    console.log('leave-session', activeSession, user.id)
+    console.log("leave-session", activeSession, user.id);
     socket.leave(`session:${activeSession}`);
     socket.to(`session:${activeSession}`).emit("user-left", user.id);
 
-    const [bookingId, record] = connectionManager.getBookingBySessionId(activeSession) || [];
+    const [bookingId, record] =
+      connectionManager.getBookingBySessionId(activeSession) || [];
     if (bookingId) {
       if (!record.users.has(user.id)) {
-        const remainingSlots = connectionManager.incrementOpenBookingSlots(bookingId)
+        const remainingSlots =
+          connectionManager.incrementOpenBookingSlots(bookingId);
         if (remainingSlots === 1) {
-          await SessionService.updateSessionVisibility(activeSession, 'open')
-          return
+          await SessionService.updateSessionVisibility(activeSession, "open");
+          return;
         }
       }
     }
@@ -163,7 +178,6 @@ export class SessionService {
 
   static async endSession(sessionId: string): Promise<void> {
     try {
-
       // Validate session exists
       const sessionData = await SessionService.getActiveSession(sessionId);
 
@@ -176,7 +190,6 @@ export class SessionService {
         ...sessionData,
         status: "ended",
       });
-
     } catch (error) {
       console.error("Error ending session:", error);
       throw error;

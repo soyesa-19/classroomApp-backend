@@ -2,14 +2,15 @@ import { Socket } from "socket.io";
 import { ConnectionManager } from "../services/connectionManager.js";
 import { UserScoreService } from "../../services/userScoreService.js";
 import { SessionService } from "../../services/sessionService.js";
+import UserService from "../../services/userService.js";
 
 const connectionManager = ConnectionManager.getInstance();
 
 export const handleSessionEvents = (socket: Socket) => {
   // Join a session
-  socket.on("join-session", async (sessionId: string) => {
+  socket.on("join-session", async (sessionId: string, cb) => {
     const { user } = socket.data;
-    console.log(sessionId, user, connectionManager.getConnectionStats())
+
     connectionManager.updateUserSessionStatus(sessionId, user.id, true);
 
     socket.join(`session:${sessionId}`);
@@ -17,15 +18,26 @@ export const handleSessionEvents = (socket: Socket) => {
       userId: user.id,
       username: `${user.firstName} ${user.lastName}`,
       timestamp: new Date().toISOString(),
+      currentUser: false,
     });
+    const sessionUsers = connectionManager.getActiveSessionUsers(sessionId);
+    const userDetails = await UserService.getUsers(sessionUsers);
+    const sessionUserDetails = userDetails.map((userDetail) => ({
+      userId: userDetail.id,
+      username: userDetail.firstName + " " + userDetail.lastName,
+      timestamp: new Date().toISOString(),
+    }));
+    cb(sessionUserDetails);
 
-    const [bookingId, record] = connectionManager.getBookingBySessionId(sessionId) || [];
+    const [bookingId, record] =
+      connectionManager.getBookingBySessionId(sessionId) || [];
     if (bookingId) {
       if (!record.users.has(user.id)) {
-        const remainingSlots = connectionManager.decrementOpenBookingSlots(bookingId)
+        const remainingSlots =
+          connectionManager.decrementOpenBookingSlots(bookingId);
         if (remainingSlots === 0) {
-          await SessionService.updateSessionVisibility(sessionId, 'restricted')
-          return
+          await SessionService.updateSessionVisibility(sessionId, "restricted");
+          return;
         }
       }
     }
@@ -34,7 +46,7 @@ export const handleSessionEvents = (socket: Socket) => {
   // Leave a session
   socket.on("leave-session", async (sessionId: string) => {
     const { user } = socket.data;
-    await SessionService.leaveSession(user.id)
+    await SessionService.leaveSession(user.id);
   });
 
   // Handle session messages

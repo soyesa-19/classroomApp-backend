@@ -37,13 +37,17 @@ export const joinClassroomUsingBookingId = async (
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const booking = await BookingService.getBookingById(bookingId)
+    const booking = await BookingService.getBookingById(bookingId);
     if (!booking) {
-      return res.status(404).json({error: "No booking found!"})
+      return res.status(404).json({ error: "No booking found!" });
     }
     const classroomId = booking.classroomId;
 
-    const result = await ClassroomService.joinClassroom(classroomId, userId, booking);
+    const result = await ClassroomService.joinClassroom(
+      classroomId,
+      userId,
+      booking
+    );
 
     return res.status(200).json(result);
   } catch (error: any) {
@@ -52,7 +56,6 @@ export const joinClassroomUsingBookingId = async (
     return res.status(statusCode).json({ error: error.message });
   }
 };
-
 
 export const leaveClassrooom = async (
   req: AuthenticatedRequest,

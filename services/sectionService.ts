@@ -8,6 +8,9 @@ export class SectionService {
   ) as CollectionReference<Section>;
 
   static async getSectionsByIds(ids: string[]): Promise<Section[]> {
+    if (ids.length === 0) {
+      return [];
+    }
     const docRefs = ids.map((id) => SectionService.sectionCollection.doc(id));
 
     const sectionSnaps = await db.getAll(...docRefs);
