@@ -117,6 +117,7 @@ export class ClassroomService {
       session,
       scores: sessionScores,
       sections,
+      startTime: classroom.startTime,
     };
   }
 
